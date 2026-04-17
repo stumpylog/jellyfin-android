@@ -28,6 +28,7 @@ import androidx.core.content.getSystemService
 import androidx.core.text.HtmlCompat
 import coil3.ImageLoader
 import coil3.request.ImageRequest
+import coil3.size.Scale
 import coil3.toBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +64,7 @@ import org.jellyfin.mobile.utils.applyDefaultLocalAudioAttributes
 import org.jellyfin.mobile.utils.createMediaNotificationChannel
 import org.jellyfin.mobile.utils.setPlaybackState
 import org.koin.android.ext.android.inject
+import timber.log.Timber
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration.Companion.hours
 
@@ -217,9 +219,16 @@ class RemotePlayerService : Service(), CoroutineScope {
             // Resolve notification bitmap
             val cachedBitmap = largeItemIcon?.takeIf { itemId == currentItemId }
             val bitmap = cachedBitmap ?: if (!imageUrl.isNullOrEmpty()) {
-                val request = ImageRequest.Builder(this@RemotePlayerService).data(imageUrl).build()
-                imageLoader.execute(request).image?.toBitmap()?.also { bitmap ->
-                    largeItemIcon = bitmap // Cache bitmap for later use
+                val request = ImageRequest.Builder(this@RemotePlayerService)
+                    .data(imageUrl)
+                    .size(ARTWORK_MAX_SIZE, ARTWORK_MAX_SIZE)
+                    .scale(Scale.FIT)
+                    .build()
+                imageLoader.execute(request).image?.toBitmap()?.also { loaded ->
+                    largeItemIcon = loaded
+                } ?: run {
+                    Timber.w("Album art bitmap was null for item %s", itemId)
+                    null
                 }
             } else {
                 null
@@ -234,6 +243,7 @@ class RemotePlayerService : Service(), CoroutineScope {
                     putString(MediaMetadata.METADATA_KEY_TITLE, title)
                     putLong(MediaMetadata.METADATA_KEY_DURATION, duration)
                     if (bitmap != null) putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, bitmap)
+                    if (!imageUrl.isNullOrEmpty()) putString(MediaMetadata.METADATA_KEY_ART_URI, imageUrl)
                 }.build()
                 mediaSession.setMetadata(metadata)
                 currentItemId = itemId
@@ -466,6 +476,10 @@ class RemotePlayerService : Service(), CoroutineScope {
         mediaSession?.release()
         mediaSession = null
         super.onDestroy()
+    }
+
+    companion object {
+        private const val ARTWORK_MAX_SIZE = 500
     }
 
     class ServiceBinder(private val service: RemotePlayerService) : Binder() {

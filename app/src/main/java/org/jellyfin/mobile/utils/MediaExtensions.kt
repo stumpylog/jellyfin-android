@@ -2,6 +2,7 @@
 
 package org.jellyfin.mobile.utils
 
+import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaMetadata
@@ -27,7 +28,7 @@ inline fun MediaSession.applyDefaultLocalAudioAttributes(contentType: Int) {
     setPlaybackToLocal(audioAttributes)
 }
 
-fun JellyfinMediaSource.toMediaMetadata(): MediaMetadata = MediaMetadata.Builder().apply {
+fun JellyfinMediaSource.toMediaMetadata(albumArtBitmap: Bitmap? = null): MediaMetadata = MediaMetadata.Builder().apply {
     putString(MediaMetadata.METADATA_KEY_MEDIA_ID, itemId.toString())
     putString(MediaMetadata.METADATA_KEY_TITLE, item?.name ?: sourceInfo.name.orEmpty())
     item?.artists?.joinToString()?.let { artists ->
@@ -36,6 +37,7 @@ fun JellyfinMediaSource.toMediaMetadata(): MediaMetadata = MediaMetadata.Builder
     putLong(MediaMetadata.METADATA_KEY_DURATION, runTime.inWholeMilliseconds)
     val imageUri = ImageProvider.buildItemUri(itemId, ImageType.PRIMARY, item?.imageTags?.get(ImageType.PRIMARY))
     putString(MediaMetadata.METADATA_KEY_ART_URI, imageUri.toString())
+    if (albumArtBitmap != null) putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, albumArtBitmap)
 }.build()
 
 fun MediaSession.setPlaybackState(playbackState: Int, position: Long, playbackActions: Long) {

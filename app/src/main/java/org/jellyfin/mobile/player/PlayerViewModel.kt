@@ -26,6 +26,10 @@ import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.util.EventLogger
+import coil3.ImageLoader
+import coil3.request.ImageRequest
+import coil3.size.Scale
+import coil3.toBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -49,6 +53,7 @@ import org.jellyfin.mobile.player.ui.DecoderType
 import org.jellyfin.mobile.player.ui.DisplayPreferences
 import org.jellyfin.mobile.player.ui.PlayState
 import org.jellyfin.mobile.player.ui.playermenuhelper.PlayerMenuHelper
+import org.jellyfin.mobile.ui.content.ImageProvider
 import org.jellyfin.mobile.utils.Constants
 import org.jellyfin.mobile.utils.Constants.SUPPORTED_VIDEO_PLAYER_PLAYBACK_ACTIONS
 import org.jellyfin.mobile.utils.applyDefaultAudioAttributes
@@ -73,6 +78,7 @@ import org.jellyfin.sdk.api.operations.DisplayPreferencesApi
 import org.jellyfin.sdk.api.operations.HlsSegmentApi
 import org.jellyfin.sdk.api.operations.PlayStateApi
 import org.jellyfin.sdk.api.operations.UserApi
+import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.ChapterInfo
 import org.jellyfin.sdk.model.api.MediaSegmentDto
 import org.jellyfin.sdk.model.api.PlayMethod
@@ -102,6 +108,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     private val lifecycleObserver = PlayerLifecycleObserver(this)
     private val audioManager: AudioManager by lazy { getApplication<Application>().getSystemService()!! }
+    private val imageLoader: ImageLoader by inject()
     val notificationHelper: PlayerNotificationHelper by lazy { PlayerNotificationHelper(this) }
 
     // Media source handling
@@ -299,6 +306,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         player.playWhenReady = playWhenReady
 
         mediaSession.setMetadata(jellyfinMediaSource.toMediaMetadata())
+
+        // Async-load artwork bitmap so car head units receive it over AVRCP
+        viewModelScope.launch {
+            val imageUri = ImageProvider.buildItemUri(
+                jellyfinMediaSource.itemId,
+                ImageType.PRIMARY,
+                jellyfinMediaSource.item?.imageTags?.get(ImageType.PRIMARY),
+            )
+            val request = ImageRequest.Builder(getApplication())
+                .data(imageUri)
+                .size(ARTWORK_MAX_SIZE, ARTWORK_MAX_SIZE)
+                .scale(Scale.FIT)
+                .build()
+            val bitmap = imageLoader.execute(request).image?.toBitmap()
+            if (bitmap != null) {
+                mediaSession.setMetadata(jellyfinMediaSource.toMediaMetadata(bitmap))
+            } else {
+                Timber.w("Album art failed to load for item %s", jellyfinMediaSource.itemId)
+            }
+        }
 
         if (jellyfinMediaSource is RemoteJellyfinMediaSource) {
             viewModelScope.launch {
@@ -774,5 +801,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     fun setPlayerMenuHelper(menuHelper: PlayerMenuHelper) {
         playerMenuHelper = menuHelper
+    }
+
+    companion object {
+        private const val ARTWORK_MAX_SIZE = 500
     }
 }
