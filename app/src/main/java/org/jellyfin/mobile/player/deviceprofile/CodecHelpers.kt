@@ -187,6 +187,9 @@ object CodecHelpers {
         CodecProfileLevel.AVCLevel5 -> "5"
         CodecProfileLevel.AVCLevel51 -> "51"
         CodecProfileLevel.AVCLevel52 -> "52"
+        CodecProfileLevel.AVCLevel6 -> "6"
+        CodecProfileLevel.AVCLevel61 -> "61"
+        CodecProfileLevel.AVCLevel62 -> "62"
         CodecProfileLevel.AVCLevel1b -> null
         else -> null
     }
