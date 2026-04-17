@@ -295,6 +295,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
         player.setMediaSource(exoMediaSource)
         player.prepare()
+        player.playbackParameters = player.playbackParameters.withSpeed(playSpeed)
 
         initialTracksSelected.set(false)
 
